@@ -1,8 +1,10 @@
 package util
 
 import (
+	"bufio"
 	"fmt"
 	"io/fs"
+	"strings"
 )
 
 type Trie struct {
@@ -15,17 +17,50 @@ type TrieNode struct {
 }
 
 var numberMappings = map[byte]byte{
-	'a': '1',
-	'b': '1',
-	'c': '1',
+	'a': '2',
+	'b': '2',
+	'c': '2',
+	'd': '3',
+	'e': '3',
+	'f': '3',
+	'g': '4',
+	'h': '4',
+	'i': '4',
+	'j': '5',
+	'k': '5',
+	'l': '5',
+	'm': '6',
+	'n': '6',
+	'o': '6',
+	'p': '7',
+	'q': '7',
+	'r': '7',
+	's': '7',
+	't': '8',
+	'u': '8',
+	'v': '8',
+	'x': '9',
+	'y': '9',
+	'z': '9',
 }
 
 func NewTrie(file fs.File) (*Trie, error) {
 	trie := &Trie{
 		newTrieNode(),
 	}
-	trie.insert("abc")
-	return trie, nil
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		trie.insert(strings.TrimSpace(line))
+	}
+
+	err := scanner.Err()
+	if err != nil {
+		return nil, err
+	} else {
+		return trie, nil
+	}
 }
 
 func newTrieNode() *TrieNode {
