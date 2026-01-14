@@ -2,27 +2,36 @@ package t9emulator
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rafe-murray/t9emulator/pkg/util"
 )
 
 type model struct {
-	choices  []string         // items on the to-do list
-	cursor   int              // which to-do list item our cursor is pointing at
-	selected map[int]struct{} // which to-do items are selected
+	dictionary        *util.Trie
+	lookupStart       *util.TrieNode
+	currentWord       []byte
+	completionOptions []string
+	selected          int
+	message           string
 }
 
-func InitialModel() model {
-	return model{
-		// Our to-do list is a grocery list
-		choices: []string{"Buy carrots", "Buy celery", "Buy kohlrabi"},
-
-		// A map which indicates which choices are selected. We're using
-		// the  map like a mathematical set. The keys refer to the indexes
-		// of the `choices` slice, above.
-		selected: make(map[int]struct{}),
+func NewModel() (*model, error) {
+	// TODO: make this a better file location
+	file, error := os.Open("dictionary.txt")
+	if error != nil {
+		return nil, error
 	}
+	dictionary, error := util.NewTrie(file)
+	if error != nil {
+		return nil, error
+	}
+
+	return &model{
+		dictionary: dictionary,
+	}, nil
 }
 
 func (m model) Init() tea.Cmd {
@@ -30,40 +39,39 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+func (m model) resetCompletion() {
+	m.completionOptions = []string{}
+	m.selected = 0
+	m.lookupStart = nil
+	m.currentWord = []byte{}
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	// Is it a key press?
 	case tea.KeyMsg:
-
+		s := msg.String()
 		// Cool, what was the actual key pressed?
-		switch msg.String() {
+		switch s {
 
 		// These keys should exit the program.
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
-
-		// The "up" and "k" keys move the cursor up
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+			m.currentWord = append(m.currentWord, s[0])
+			var err error
+			m.completionOptions, m.lookupStart, err = m.dictionary.Lookup(m.currentWord, nil)
+			if err != nil {
+				fmt.Printf("Error: %v", err)
+				return m, tea.Quit
 			}
 
-		// The "down" and "j" keys move the cursor down
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-
-		// The "enter" key and the spacebar (a literal space) toggle
-		// the selected state for the item that the cursor is pointing at.
-		case "enter", " ":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
-			}
+		case "0":
+			m.message = m.message + m.completionOptions[m.selected] + " "
+			m.resetCompletion()
+		case "*":
+		case "#":
 		}
 	}
 
@@ -75,29 +83,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	// The header
 	var s strings.Builder
-	s.WriteString("What should we buy at the market?\n\n")
+	s.WriteString(m.message + string(m.currentWord))
 
 	// Iterate over our choices
-	for i, choice := range m.choices {
+	for i, choice := range m.completionOptions {
 
 		// Is the cursor pointing at this choice?
 		cursor := " " // no cursor
-		if m.cursor == i {
+		if m.selected == i {
 			cursor = ">" // cursor!
 		}
 
-		// Is this choice selected?
-		checked := " " // not selected
-		if _, ok := m.selected[i]; ok {
-			checked = "x" // selected!
-		}
-
 		// Render the row
-		fmt.Fprintf(&s, "%s [%s] %s\n", cursor, checked, choice)
+		fmt.Fprintf(&s, "%s %s\n", cursor, choice)
 	}
-
-	// The footer
-	s.WriteString("\nPress q to quit.\n")
 
 	// Send the UI for rendering
 	return s.String()
