@@ -1,4 +1,4 @@
-module github.com
+module github.com/rafe-murray/t9emulator
 
 go 1.25.5
 

@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	p := tea.NewProgram(t9.initialModel())
+	p := tea.NewProgram(t9.InitialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
